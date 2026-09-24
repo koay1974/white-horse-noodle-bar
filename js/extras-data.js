@@ -1,0 +1,45 @@
+// Extras & combo-base configuration for Noodle Bar
+var EXTRAS_DATA = {
+  baseOptions: [
+    { id: "base1", cn: "炒饭", en: "Fried Rice", price: 0.00, def: true },
+    { id: "base2", cn: "白饭", en: "Boiled Rice", price: 0.00 },
+    { id: "base3", cn: "免饭", en: "No Rice", price: 0.00 },
+    { id: "base4", cn: "炒面", en: "Noodles", price: 0.80 },
+    { id: "base5", cn: "条(Chips)", en: "Chips", price: 0.95 }
+  ],
+  extras: [
+    { code: "EX1",  cn: "加辣",       en: "Extra Hot",        price: 0.00 },
+    { code: "EX2",  cn: "免辣",       en: "No Hot/Spicy",     price: 0.00 },
+    { code: "EX3",  cn: "加鸡",       en: "Add Chicken",      price: 2.60 },
+    { code: "EX4",  cn: "加大虾",     en: "Add King Prawn",   price: 2.95 },
+    { code: "EX5",  cn: "加虾仔",     en: "Add Shrimp",       price: 2.95 },
+    { code: "EX6",  cn: "加牛",       en: "Add Beef",         price: 2.80 },
+    { code: "EX7",  cn: "免菜",       en: "No Veg",           price: 0.00 },
+    { code: "EX8",  cn: "免芽菜",     en: "No Bean Sprouts",  price: 0.00 },
+    { code: "EX9",  cn: "免鸡",       en: "No Chicken",       price: 0.00 },
+    { code: "EX10", cn: "免大虾",     en: "No King Prawn",    price: 0.00 },
+    { code: "EX11", cn: "免虾仔",     en: "No Shrimp",        price: 0.00 },
+    { code: "EX12", cn: "免牛",       en: "No Beef",          price: 0.00 },
+    { code: "EX13", cn: "免洋葱",     en: "No Onion",         price: 0.00 },
+    { code: "EX14", cn: "免老抽",     en: "No Dark Soy Sauce", price: 0.00 },
+    { code: "EX15", cn: "免海鲜",     en: "No Seafood",       price: 0.00 },
+    { code: "EX16", cn: "加叉烧",     en: "Add Roast Pork",   price: 2.60 },
+    { code: "EX17", cn: "免叉烧",     en: "No Roast Pork",    price: 0.00 },
+    { code: "EX18", cn: "加鸭皮",     en: "Extra Pancake",    price: 1.50 },
+    { code: "EX19", cn: "免青豆",     en: "No Peas",          price: 0.00 },
+    { code: "EX20", cn: "免红萝卜",   en: "No Carrots",       price: 0.00 },
+    { code: "EX21", cn: "免鱿鱼",     en: "No Squid",         price: 0.00 },
+    { code: "EX22", cn: "花生油过敏", en: "No Peanuts",       price: 0.00 },
+    { code: "EX23", cn: "蛋糕服务",   en: "Cake Service",     price: 5.00 },
+    { code: "EX24", cn: "加豆腐",     en: "Add Tofu",         price: 2.30 },
+    { code: "EX25", cn: "免青椒",     en: "No Green Peppers", price: 0.00 },
+    { code: "EX26", cn: "免青葱",     en: "No Spring Onion",  price: 0.00 },
+    { code: "EX27", cn: "免青口",     en: "No Mussels",       price: 0.00 },
+    { code: "EX28", cn: "免味精",     en: "No MSG",           price: 0.00 },
+    { code: "EX29", cn: "免蛋",       en: "No Egg",           price: 0.00 },
+    { code: "EX30", cn: "免麻油",     en: "No Sesame Oil",    price: 0.00 },
+    { code: "EX31", cn: "免糖",       en: "No Sugar",         price: 0.00 },
+    { code: "EX32", cn: "免盐",       en: "No Salt",          price: 0.00 },
+    { code: "EX33", cn: "免生抽",     en: "No Light Soy Sauce", price: 0.00 }
+  ]
+};

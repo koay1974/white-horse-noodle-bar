@@ -8,6 +8,11 @@
   var CATEGORIES = D.categories;
   var ZONES = D.delivery_zones || [];
 
+  // categories (by id) that get the combo base + extras dialog ("main dishes")
+  var COMBO_CAT_IDS = [1274474];
+  var BASE_OPTIONS = EXTRAS_DATA.baseOptions;
+  var EXTRA_OPTIONS = EXTRAS_DATA.extras;
+
   var cart = loadCart();
 
   /* ---------- helpers ---------- */
@@ -64,6 +69,18 @@
     return null;
   }
 
+  function isComboItem(itemId) {
+    for (var i = 0; i < CATEGORIES.length; i++) {
+      var cat = CATEGORIES[i];
+      if (COMBO_CAT_IDS.indexOf(cat.id) > -1) {
+        for (var j = 0; j < cat.items.length; j++) {
+          if (cat.items[j].id === itemId) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /* ---------- toast ---------- */
   var toastTimer = null;
   function toast(msg) {
@@ -104,14 +121,22 @@
   function itemCard(cat, item) {
     var price = money(item.price);
     var hasOptions = item.sizes && item.sizes.length > 0;
-    var control = hasOptions
-      ? '<button type="button" class="item-add-btn" data-options="' + item.id + '">Choose</button>'
-      : '<button type="button" class="item-add-btn" data-add="' + item.id + '">+ Add</button>';
+    var combo = isComboItem(item.id);
+    var control;
+    if (combo) {
+      control = '<button type="button" class="item-add-btn" data-options="' + item.id + '">Customise</button>';
+    } else if (hasOptions) {
+      control = '<button type="button" class="item-add-btn" data-options="' + item.id + '">Choose</button>';
+    } else {
+      control = '<button type="button" class="item-add-btn" data-add="' + item.id + '">+ Add</button>';
+    }
     var desc = item.description ? '<p class="item-desc">' + esc(item.description) + '</p>' : '';
+    var tag = combo ? '<p class="item-tag">Comes with fried rice · choose noodles / chips 配炒饭</p>' : '';
     return '' +
       '<div class="item-card">' +
       '  <div class="item-foot"><span class="item-price">' + price + '</span>' + control + '</div>' +
       '  <h3 class="item-name">' + esc(item.name) + '</h3>' +
+      tag +
       desc +
       '</div>';
   }
@@ -153,16 +178,41 @@
   }
 
   /* ---------- cart ops ---------- */
-  function addToCart(item, sizeLabel) {
-    var key = String(item.id) + (sizeLabel ? '|' + sizeLabel : '');
+  function addToCart(item, opts) {
+    opts = opts || {};
+    var extras = opts.extras || [];
+    var base = opts.base || null;
+    var unit = round2(
+      item.price
+      + (opts.sizePrice || 0)
+      + (base ? base.price : 0)
+      + extras.reduce(function (s, e) { return s + e.price; }, 0)
+    );
+    var extraKey = extras.map(function (e) { return e.code; }).sort().join(',');
+    var key = String(item.id)
+      + (opts.size ? '|S:' + opts.size : '')
+      + (base ? '|B:' + base.id : '')
+      + (extraKey ? '|E:' + extraKey : '');
+
     if (!cart[key]) {
-      cart[key] = { id: item.id, size: sizeLabel || null, qty: 1, unit: item.price, name: item.name };
+      cart[key] = {
+        id: item.id,
+        size: opts.size || null,
+        base: base,
+        extras: extras,
+        qty: 1,
+        unit: unit,
+        name: item.name
+      };
     } else {
       cart[key].qty += 1;
     }
     saveCart();
     refreshCartUI();
-    var label = item.name + (sizeLabel ? ' (' + sizeLabel + ')' : '');
+    var label = item.name
+      + (opts.size ? ' (' + opts.size + ')' : '')
+      + (base ? ' (' + base.en + ')' : '')
+      + (extras.length ? ' +' + extras.length + ' add-on' + (extras.length > 1 ? 's' : '') : '');
     toast('Added: ' + label);
   }
 
@@ -200,10 +250,21 @@
 
     var rows = cartKeys().map(function (k) {
       var line = cart[k];
+      var details = '';
+      if (line.size) details += '<div class="cart-line-detail">' + esc(line.size) + '</div>';
+      if (line.base) details += '<div class="cart-line-detail">Base: ' + esc(line.base.cn) + ' ' + esc(line.base.en) + '</div>';
+      if (line.extras && line.extras.length) {
+        details += line.extras.map(function (x) {
+          return '<div class="cart-line-detail">+ ' + esc(x.cn) + ' ' + esc(x.en) +
+            (x.price ? ' <span class="cart-line-detail-price">+' + money(x.price) + '</span>' : '') +
+            '</div>';
+        }).join('');
+      }
       return '' +
         '<div class="cart-item">' +
         '  <div class="cart-item-info">' +
-        '    <div class="cart-item-name">' + esc(line.name) + (line.size ? ' <small>(' + esc(line.size) + ')</small>' : '') + '</div>' +
+        '    <div class="cart-item-name">' + esc(line.name) + '</div>' +
+        details +
         '    <div class="cart-item-price">' + money(line.unit) + ' each</div>' +
         '  </div>' +
         '  <div class="cart-item-controls">' +
@@ -243,10 +304,17 @@
     $('#cartDrawer').setAttribute('aria-hidden', 'true');
   }
 
-  /* ---------- options modal (items with sizes) ---------- */
+  /* ---------- options modal ---------- */
   function openOptions(itemId) {
     var item = findItem(itemId);
     if (!item) return;
+    if (isComboItem(itemId)) { openComboDialog(item); return; }
+    if (item.sizes && item.sizes.length > 0) { openSizeDialog(item); return; }
+    addToCart(item, {});
+  }
+
+  /* size-only dialog (e.g. J20 bottles) */
+  function openSizeDialog(item) {
     var html = '<h2>' + esc(item.name) + '</h2>';
     if (item.description) html += '<p class="item-desc">' + esc(item.description) + '</p>';
     html += '<div class="option-list">';
@@ -266,14 +334,63 @@
       var picked = $('input[name="opt"]:checked');
       if (!picked) return;
       var size = item.sizes[Number(picked.value)];
-      var unit = round2(item.price + (size.price || 0));
-      var key = String(item.id) + '|' + size.name;
-      if (!cart[key]) cart[key] = { id: item.id, size: size.name, qty: 1, unit: unit, name: item.name };
-      else cart[key].qty += 1;
-      saveCart();
-      refreshCartUI();
+      addToCart(item, { size: size.name, sizePrice: size.price || 0 });
       closeModal();
-      toast('Added: ' + item.name + ' (' + size.name + ')');
+    };
+  }
+
+  /* combo dialog: base (rice/noodles) + extras for main dishes */
+  function openComboDialog(item) {
+    var html = '<h2>' + esc(item.name) + '</h2>';
+    if (item.description) html += '<p class="item-desc">' + esc(item.description) + '</p>';
+    html += '<p class="dialog-sub">Base · 配饭/面 <small>— comes with fried rice by default</small></p>';
+    html += '<div class="option-list">';
+    BASE_OPTIONS.forEach(function (b, bi) {
+      html +=
+        '<label class="option">' +
+        '  <input type="radio" name="base" value="' + bi + '"' + (b.def ? ' checked' : '') + '>' +
+        '  <span>' + esc(b.en) + ' ' + esc(b.cn) + '</span>' +
+        (b.price ? '<span class="option-price">+' + money(b.price) + '</span>' : '') +
+        '</label>';
+    });
+    html += '</div>';
+    html += '<p class="dialog-sub">Add-ons · 加料 <small>— optional, tick what you want</small></p>';
+    html += '<div class="opt-grid">';
+    EXTRA_OPTIONS.forEach(function (x, xi) {
+      html +=
+        '<label class="opt-chip">' +
+        '  <input type="checkbox" value="' + xi + '">' +
+        '  <span class="opt-chip-label">' + esc(x.en) +
+        (x.price ? ' <b class="opt-chip-price">+' + money(x.price) + '</b>' : '') +
+        '</span>' +
+        '</label>';
+    });
+    html += '</div>';
+    html += '<div class="option-actions">' +
+      '<div class="combo-total">Total <span id="comboTotal">' + money(item.price) + '</span></div>' +
+      '<button type="button" class="btn btn-primary" id="optAdd">Add to basket</button>' +
+      '</div>';
+    showModalHtml(html);
+
+    var totalEl = $('#comboTotal');
+    function updateTotal() {
+      var base = BASE_OPTIONS[Number($('input[name="base"]:checked').value)];
+      var extraSum = $all('#modalOverlay .opt-chip input:checked').reduce(function (s, cb) {
+        s += EXTRA_OPTIONS[Number(cb.value)].price;
+        return s;
+      }, 0);
+      totalEl.textContent = money(round2(item.price + (base.price || 0) + extraSum));
+    }
+    $all('#modalOverlay [name="base"]').forEach(function (r) { r.onchange = updateTotal; });
+    $all('#modalOverlay .opt-chip input').forEach(function (cb) { cb.onchange = updateTotal; });
+
+    $('#optAdd').onclick = function () {
+      var base = BASE_OPTIONS[Number($('input[name="base"]:checked').value)];
+      var extras = $all('#modalOverlay .opt-chip input:checked').map(function (cb) {
+        return EXTRA_OPTIONS[Number(cb.value)];
+      });
+      addToCart(item, { base: base, extras: extras });
+      closeModal();
     };
   }
 
@@ -419,6 +536,16 @@
       var line = cart[k];
       var nm = line.name + (line.size ? ' (' + line.size + ')' : '');
       lines.push('• ' + line.qty + ' × ' + nm + ' — ' + money(linePrice(k)));
+      if (line.base) {
+        lines.push('     配' + line.base.cn + ' ' + line.base.en +
+          (line.base.price ? ' (+' + money(line.base.price) + ')' : ''));
+      }
+      if (line.extras && line.extras.length) {
+        line.extras.forEach(function (x) {
+          lines.push('     + ' + x.cn + ' ' + x.en +
+            (x.price ? ' (+' + money(x.price) + ')' : ''));
+        });
+      }
     });
     lines.push('');
     lines.push('Subtotal: ' + money(subtotal()));
