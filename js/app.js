@@ -120,16 +120,10 @@
 
   function itemCard(cat, item) {
     var price = money(item.price);
-    var hasOptions = item.sizes && item.sizes.length > 0;
     var combo = isComboItem(item.id);
-    var control;
-    if (combo) {
-      control = '<button type="button" class="item-add-btn" data-options="' + item.id + '">Customise</button>';
-    } else if (hasOptions) {
-      control = '<button type="button" class="item-add-btn" data-options="' + item.id + '">Choose</button>';
-    } else {
-      control = '<button type="button" class="item-add-btn" data-add="' + item.id + '">+ Add</button>';
-    }
+    var size = item.sizes && item.sizes.length > 0;
+    var label = combo ? 'View & Customise' : (size ? 'View & Choose' : 'View & Add');
+    var control = '<button type="button" class="item-add-btn" data-detail="' + item.id + '">' + label + '</button>';
     var desc = item.description ? '<p class="item-desc">' + esc(item.description) + '</p>' : '';
     var tag = combo ? '<p class="item-tag">Comes with fried rice · choose noodles / chips 配炒饭</p>' : '';
     return '' +
@@ -182,6 +176,7 @@
     opts = opts || {};
     var extras = opts.extras || [];
     var base = opts.base || null;
+    var qty = Math.max(1, Number(opts.qty) || 1);
     var unit = round2(
       item.price
       + (opts.sizePrice || 0)
@@ -200,12 +195,12 @@
         size: opts.size || null,
         base: base,
         extras: extras,
-        qty: 1,
+        qty: qty,
         unit: unit,
         name: item.name
       };
     } else {
-      cart[key].qty += 1;
+      cart[key].qty += qty;
     }
     saveCart();
     refreshCartUI();
@@ -308,42 +303,91 @@
   function openOptions(itemId) {
     var item = findItem(itemId);
     if (!item) return;
-    if (isComboItem(itemId)) { openComboDialog(item); return; }
-    if (item.sizes && item.sizes.length > 0) { openSizeDialog(item); return; }
-    addToCart(item, {});
+    openDetailDialog(item);
   }
 
-  /* size-only dialog (e.g. J20 bottles) */
-  function openSizeDialog(item) {
+  /* unified detail dialog: shows what's in the dish + qty (+ combo base/extras/sizes) */
+  function openDetailDialog(item) {
     var html = '<h2>' + esc(item.name) + '</h2>';
-    if (item.description) html += '<p class="item-desc">' + esc(item.description) + '</p>';
-    html += '<div class="option-list">';
-    item.sizes.forEach(function (s, si) {
-      html +=
-        '<label class="option">' +
-        '  <input type="radio" name="opt" value="' + si + '"' + (si === 0 ? ' checked' : '') + '>' +
-        '  <span>' + esc(s.name) + '</span>' +
-        (s.price ? '<span class="option-price">+' + money(s.price) + '</span>' : '') +
-        '</label>';
-    });
-    html += '</div>';
-    html += '<div class="option-actions"><button type="button" class="btn btn-primary" id="optAdd">Add to basket</button></div>';
+    if (item.description) {
+      html += '<p class="item-desc dialog-desc">' + esc(item.description) + '</p>';
+    }
+    html += '<div class="dialog-price-line">' + money(item.price) + '</div>';
+
+    var addOn = isComboItem(item.id) ? comboAddonHtml() : (item.sizes && item.sizes.length ? sizeAddonHtml(item) : '');
+    html += addOn;
+
+    // quantity stepper
+    html += '<div class="qty-row">' +
+      '<span class="qty-label">Quantity</span>' +
+      '<div class="qty-stepper">' +
+      '<button type="button" class="ctl-btn" data-qty="-1" aria-label="Decrease">−</button>' +
+      '<span class="cart-item-amt" id="qtyVal">1</span>' +
+      '<button type="button" class="ctl-btn" data-qty="1" aria-label="Increase">+</button>' +
+      '</div>' +
+      '</div>';
+
+    html += '<div class="option-actions">' +
+      '<div class="combo-total">Total <span id="comboTotal">' + money(item.price) + '</span></div>' +
+      '<button type="button" class="btn btn-primary" id="optAdd">Add to basket</button>' +
+      '</div>';
     showModalHtml(html);
 
+    var totalEl = $('#comboTotal');
+    // bind listeners
+    var baseRadios = $all('#modalOverlay [name="base"]');
+    var extraBoxes = $all('#modalOverlay .opt-chip input');
+    var sizeRadios = $all('#modalOverlay [name="opt"]');
+    var qtyEl = $('#qtyVal');
+
+    function currentQty() { return Math.max(1, Number(qtyEl.textContent) || 1); }
+    function addonSum() {
+      var s = 0;
+      if (baseRadios.length) {
+        var b = $('input[name="base"]:checked');
+        if (b) s += (BASE_OPTIONS[Number(b.value)].price || 0);
+      }
+      if (sizeRadios.length) {
+        var sz = $('input[name="opt"]:checked');
+        if (sz) s += (item.sizes[Number(sz.value)].price || 0);
+      }
+      extraBoxes.forEach(function (cb) { if (cb.checked) s += EXTRA_OPTIONS[Number(cb.value)].price; });
+      return s;
+    }
+    function updateTotal() {
+      totalEl.textContent = money(round2((item.price + addonSum()) * currentQty()));
+    }
+    baseRadios.forEach(function (r) { r.onchange = updateTotal; });
+    sizeRadios.forEach(function (r) { r.onchange = updateTotal; });
+    extraBoxes.forEach(function (cb) { cb.onchange = updateTotal; });
+    $all('#modalOverlay [data-qty]').forEach(function (b) {
+      b.onclick = function () {
+        var v = currentQty() + Number(b.getAttribute('data-qty'));
+        qtyEl.textContent = Math.max(1, v);
+        updateTotal();
+      };
+    });
+
     $('#optAdd').onclick = function () {
-      var picked = $('input[name="opt"]:checked');
-      if (!picked) return;
-      var size = item.sizes[Number(picked.value)];
-      addToCart(item, { size: size.name, sizePrice: size.price || 0 });
+      var opts = { qty: currentQty() };
+      if (baseRadios.length) {
+        opts.base = BASE_OPTIONS[Number($('input[name="base"]:checked').value)];
+        opts.extras = extraBoxes.filter(function (cb) { return cb.checked; }).map(function (cb) {
+          return EXTRA_OPTIONS[Number(cb.value)];
+        });
+      }
+      if (sizeRadios.length) {
+        var sz = item.sizes[Number($('input[name="opt"]:checked').value)];
+        opts.size = sz.name;
+        opts.sizePrice = sz.price || 0;
+      }
+      addToCart(item, opts);
       closeModal();
     };
   }
 
-  /* combo dialog: base (rice/noodles) + extras for main dishes */
-  function openComboDialog(item) {
-    var html = '<h2>' + esc(item.name) + '</h2>';
-    if (item.description) html += '<p class="item-desc">' + esc(item.description) + '</p>';
-    html += '<p class="dialog-sub">Base · 配饭/面 <small>— comes with fried rice by default</small></p>';
+  function comboAddonHtml() {
+    var html = '<p class="dialog-sub">Base · 配饭/面 <small>— comes with fried rice by default</small></p>';
     html += '<div class="option-list">';
     BASE_OPTIONS.forEach(function (b, bi) {
       html +=
@@ -366,32 +410,22 @@
         '</label>';
     });
     html += '</div>';
-    html += '<div class="option-actions">' +
-      '<div class="combo-total">Total <span id="comboTotal">' + money(item.price) + '</span></div>' +
-      '<button type="button" class="btn btn-primary" id="optAdd">Add to basket</button>' +
-      '</div>';
-    showModalHtml(html);
+    return html;
+  }
 
-    var totalEl = $('#comboTotal');
-    function updateTotal() {
-      var base = BASE_OPTIONS[Number($('input[name="base"]:checked').value)];
-      var extraSum = $all('#modalOverlay .opt-chip input:checked').reduce(function (s, cb) {
-        s += EXTRA_OPTIONS[Number(cb.value)].price;
-        return s;
-      }, 0);
-      totalEl.textContent = money(round2(item.price + (base.price || 0) + extraSum));
-    }
-    $all('#modalOverlay [name="base"]').forEach(function (r) { r.onchange = updateTotal; });
-    $all('#modalOverlay .opt-chip input').forEach(function (cb) { cb.onchange = updateTotal; });
-
-    $('#optAdd').onclick = function () {
-      var base = BASE_OPTIONS[Number($('input[name="base"]:checked').value)];
-      var extras = $all('#modalOverlay .opt-chip input:checked').map(function (cb) {
-        return EXTRA_OPTIONS[Number(cb.value)];
-      });
-      addToCart(item, { base: base, extras: extras });
-      closeModal();
-    };
+  function sizeAddonHtml(item) {
+    var html = '<p class="dialog-sub">Size</p>';
+    html += '<div class="option-list">';
+    item.sizes.forEach(function (s, si) {
+      html +=
+        '<label class="option">' +
+        '  <input type="radio" name="opt" value="' + si + '"' + (si === 0 ? ' checked' : '') + '>' +
+        '  <span>' + esc(s.name) + '</span>' +
+        (s.price ? '<span class="option-price">+' + money(s.price) + '</span>' : '') +
+        '</label>';
+    });
+    html += '</div>';
+    return html;
   }
 
   function showModalHtml(html) {
@@ -609,10 +643,8 @@
     $('#footWhats').href = 'https://wa.me/' + R.whatsapp;
 
     $('#menuContent').addEventListener('click', function (e) {
-      var addBtn = e.target.closest('[data-add]');
-      if (addBtn) { addToCart(findItem(Number(addBtn.getAttribute('data-add')))); return; }
-      var optBtn = e.target.closest('[data-options]');
-      if (optBtn) { openOptions(Number(optBtn.getAttribute('data-options'))); return; }
+      var btn = e.target.closest('[data-detail]');
+      if (btn) { openOptions(Number(btn.getAttribute('data-detail'))); return; }
     });
   }
 

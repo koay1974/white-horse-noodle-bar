@@ -327,6 +327,12 @@ a:hover { text-decoration: underline; }
 /* ---------- Options / combo dialog ---------- */
 .dialog-sub { font-weight: 700; font-size: 14px; margin: 14px 0 8px; }
 .dialog-sub small { font-weight: 400; color: var(--ink-2); }
+.dialog-desc { background: #fff; border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; }
+.dialog-price-line { font-weight: 800; font-size: 18px; color: var(--red); margin: 8px 0 2px; }
+.qty-row { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+.qty-label { font-weight: 700; font-size: 14px; }
+.qty-stepper { display: inline-flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 4px 6px; }
+.qty-stepper .cart-item-amt { min-width: 18px; text-align: center; font-weight: 800; }
 .option-list { display: flex; flex-direction: column; gap: 8px; }
 .option {
   display: flex; align-items: center; gap: 10px;
