@@ -533,7 +533,33 @@
         }
       }
 
-      var msg = buildWhatsAppMessage({ name: name, phone: phone, address: address, time: time, notes: notes });
+      var ref = orderRef();
+      var msg = buildWhatsAppMessage({ ref: ref, name: name, phone: phone, address: address, time: time, notes: notes });
+
+      var payload = {
+        ref: ref,
+        ts: Date.now(),
+        tsISO: new Date().toISOString(),
+        type: orderType,
+        items: cartKeys().map(function (k) {
+          var line = cart[k];
+          return {
+            name: line.name,
+            size: line.size || null,
+            base: line.base,
+            extras: line.extras || [],
+            qty: line.qty,
+            unit: line.unit,
+            total: linePrice(k)
+          };
+        }),
+        subtotal: subtotal(),
+        fee: deliveryFee(),
+        total: round2(subtotal() + deliveryFee()),
+        customer: { name: name, phone: phone, address: address, time: time, notes: notes },
+        status: 'new'
+      };
+      submitToCloud(payload);
 
       if (channel === 'whatsapp') {
         window.open('https://wa.me/' + R.whatsapp + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
@@ -578,7 +604,7 @@
     lines.push('*New Order — ' + R.name + '*');
     lines.push('');
     lines.push('*' + (orderType === 'delivery' ? 'Delivery' : 'Collection') + ' order*');
-    lines.push('Ref: #' + orderRef());
+    lines.push('Ref: #' + (info.ref || orderRef()));
     lines.push('');
     lines.push('*Items*');
     cartKeys().forEach(function (k) {
@@ -623,6 +649,22 @@
   function orderRef() {
     var t = Date.now().toString(36).toUpperCase().slice(-5);
     return t;
+  }
+
+  /* ---------- cloud orders (Firebase) ---------- */
+  var cloudInit = false;
+  function submitToCloud(payload) {
+    try {
+      if (!window.FB_CONFIG || !FB_CONFIG.apiKey || !FB_CONFIG.databaseURL) return;
+      if (!window.firebase) return;
+      if (!cloudInit) {
+        firebase.initializeApp(FB_CONFIG);
+        cloudInit = true;
+      }
+      firebase.auth().signInAnonymously().then(function () {
+        firebase.database().ref('orders').push(payload, function (err) { if (err) console.warn('cloud order failed', err); });
+      }).catch(function (e) { console.warn('cloud auth failed', e); });
+    } catch (e) { console.warn('cloud submit skipped', e); }
   }
 
   /* ---------- footer hours ---------- */
