@@ -56,6 +56,12 @@ a:hover { text-decoration: underline; }
 .btn-ghost:hover { background: #fff; text-decoration: none; }
 .btn-whatsapp { background: #0fb864; color: #fff; box-shadow: 0 6px 18px rgba(15, 184, 100, .35); }
 .btn-whatsapp:hover { background: #0da556; text-decoration: none; }
+.btn-email { background: #fff; color: var(--red); border: 2px solid var(--red); }
+.btn-email:hover { background: #fdf0f0; text-decoration: none; }
+.checkout-divider { display: flex; align-items: center; gap: 12px; margin: 14px 0; color: var(--ink-2); font-size: 12px; }
+.checkout-divider::before, .checkout-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.field-note { background: #fffaf0; border: 1px solid #f0d9a6; border-radius: 10px; padding: 10px 12px; }
+.field-note > span { color: var(--ink); }
 
 /* ---------- Top bar ---------- */
 .topbar {
